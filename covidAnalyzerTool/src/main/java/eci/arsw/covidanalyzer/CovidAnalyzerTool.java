@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Scanner;
 import java.util.Set;
@@ -22,6 +23,7 @@ public class CovidAnalyzerTool {
     private TestReader testReader;
     private int amountOfFilesTotal;
     private AtomicInteger amountOfFilesProcessed;
+    private LinkedList<ProcessingThread> listaThreads = new LinkedList<>();
 
     public CovidAnalyzerTool() {
         resultAnalyzer = new ResultAnalyzer();
@@ -29,17 +31,37 @@ public class CovidAnalyzerTool {
         amountOfFilesProcessed = new AtomicInteger();
     }
 
-    public void processResultData() {
+    public void processResultData(int N) {
         amountOfFilesProcessed.set(0);
         List<File> resultFiles = getResultFileList();
         amountOfFilesTotal = resultFiles.size();
-        for (File resultFile : resultFiles) {
-            List<Result> results = testReader.readResultsFromFile(resultFile);
-            for (Result result : results) {
-                resultAnalyzer.addResult(result);
-            }
-            amountOfFilesProcessed.incrementAndGet();
+        crearThreads(N,resultFiles);
+        for(ProcessingThread t:listaThreads){
+            t.start();
         }
+        for(ProcessingThread t:listaThreads){
+            try{
+                t.join();
+               
+            }catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+    
+    private void crearThreads(int N, List<File> resultFiles){
+        amountOfFilesTotal = resultFiles.size();
+        for(int i=0;i<N;i++){
+            if(amountOfFilesTotal % N != 0){
+                ProcessingThread threadCovid = new ProcessingThread(i*((int)(amountOfFilesTotal/N)+1),(i+1)*((int)(amountOfFilesTotal/N)+1)-1,resultFiles,testReader,resultAnalyzer,amountOfFilesProcessed);
+                listaThreads.add(threadCovid);
+            }
+            else{
+                ProcessingThread threadCovid = new ProcessingThread(i*(int)(amountOfFilesTotal/N),(i+1)*(int)(amountOfFilesTotal/N)-1,resultFiles,testReader,resultAnalyzer,amountOfFilesProcessed);
+                listaThreads.add(threadCovid);
+            }
+        }
+        
     }
 
     private List<File> getResultFileList() {
@@ -62,7 +84,7 @@ public class CovidAnalyzerTool {
      */
     public static void main(String... args) throws Exception {
         CovidAnalyzerTool covidAnalyzerTool = new CovidAnalyzerTool();
-        Thread processingThread = new Thread(() -> covidAnalyzerTool.processResultData());
+        Thread processingThread = new Thread(() -> covidAnalyzerTool.processResultData(5));
         processingThread.start();
         while (true) {
             Scanner scanner = new Scanner(System.in);
@@ -78,4 +100,3 @@ public class CovidAnalyzerTool {
     }
 
 }
-
